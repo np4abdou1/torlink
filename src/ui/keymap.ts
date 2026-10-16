@@ -30,6 +30,8 @@ export const HELP_GROUPS: HelpGroup[] = [
       { keys: "f", label: "Filter list" },
       { keys: "␣", label: "Mark for batch" },
       { keys: "d", label: "Download (shift+d: folder)" },
+      { keys: "v", label: "Explore files / episodes" },
+      { keys: "p", label: "Live stream (mpv)" },
       { keys: "s", label: "Sort results" },
       { keys: "z", label: "Hide dead torrents" },
       { keys: "y", label: "Copy magnet" },
@@ -121,6 +123,8 @@ export function footerHints(
     // The footer advertises only the default download key; D (download to a
     // chosen folder) stays bound but lives in the `?` sheet alone.
     { keys: "d", label: "Download" },
+    { keys: "v", label: "Files" },
+    { keys: "p", label: "Stream" },
     { keys: "y", label: "Copy" },
     resultFocus === "detail" ? EXPORT : { keys: "s", label: "Sort" },
     { keys: "/", label: "Search" },

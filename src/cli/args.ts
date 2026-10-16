@@ -38,11 +38,21 @@ export type CliCommand =
   | { kind: "attach" }
   | { kind: "update"; force?: boolean }
   | { kind: "search"; query: string; category?: SearchCategory; timeoutMs?: number }
+  | { kind: "explore"; target: string; json?: boolean }
+  | {
+      kind: "stream";
+      target: string;
+      fileIndex?: number;
+      episode?: number;
+      port?: number;
+      player?: string;
+      noPlayer?: boolean;
+    }
   | { kind: "invalid"; arg: string };
 
 // Valueless boolean flags for the headless subcommands (everything else is a
 // `--flag value` pair).
-const BOOL_FLAGS = new Set(["delete-files", "daemon"]);
+const BOOL_FLAGS = new Set(["delete-files", "daemon", "json", "no-player"]);
 
 function splitBooleans(args: string[]): { bools: Set<string>; rest: string[] } {
   const bools = new Set<string>();
@@ -184,6 +194,29 @@ function parseCommand(argv: string[]): CliCommand {
       daemon: bools.has("daemon"),
     };
   }
+  if (a === "explore" || a === "list") {
+    const { bools, rest } = splitBooleans(args.slice(1));
+    const target = rest[0];
+    if (!target) return { kind: "invalid", arg: "explore (missing target magnet or .torrent)" };
+    return { kind: "explore", target, json: bools.has("json") };
+  }
+  if (a === "stream" || a === "play") {
+    const { bools, rest: r0 } = splitBooleans(args.slice(1));
+    const { flags, rest } = readFlags(r0);
+    const target = rest[0];
+    if (!target) return { kind: "invalid", arg: "stream (missing target magnet or .torrent)" };
+    const fileIndex = flags.file !== undefined ? Number.parseInt(flags.file, 10) : undefined;
+    const episode = flags.episode !== undefined ? Number.parseInt(flags.episode, 10) : undefined;
+    return {
+      kind: "stream",
+      target,
+      fileIndex: Number.isFinite(fileIndex) ? fileIndex : undefined,
+      episode: Number.isFinite(episode) ? episode : undefined,
+      port: parsePort(flags.port),
+      player: flags.player,
+      noPlayer: bools.has("no-player"),
+    };
+  }
   if (/^magnet:\?/i.test(a)) return { kind: "run", initialMagnet: a };
   if (isInfoHash(a)) return { kind: "run", initialMagnet: a };
   if (/\.torrent$/i.test(a)) return { kind: "run", initialTorrent: a };
@@ -196,6 +229,10 @@ usage
   torlnk                      open the search TUI
   torlnk "magnet:?xt=..."     start a download on launch
   torlnk path/to/file.torrent open a .torrent file on launch
+  torlnk explore <target>     headless: inspect torrent files and episodes
+    [--json]
+  torlnk stream <target>      headless: live stream video with mpv & subtitles
+    [--file <n>] [--episode <n>] [--port <n>] [--player <bin>] [--no-player]
   torlnk search <query>        headless: print search results as JSON
     [--category games|movies|tv|anime] [--timeout <dur>]
   torlnk seed <path>          headless: share files you already have

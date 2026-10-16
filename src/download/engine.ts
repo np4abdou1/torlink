@@ -22,8 +22,15 @@ export interface TorrentMeta {
   torrentFile?: Uint8Array;
 }
 
+export interface TorrentFileInfo {
+  index: number;
+  name: string;
+  path: string;
+  length: number;
+}
+
 export interface AddHandlers {
-  onMetadata?: (meta: TorrentMeta) => void;
+  onMetadata?: (meta: TorrentMeta, files?: TorrentFileInfo[]) => void;
   // webtorrent has checked any pieces already on disk against their hashes and
   // the torrent is ready to trade. On a large seed that check runs for minutes.
   onReady?: () => void;
@@ -82,6 +89,7 @@ export class TorrentEngine {
     dir: string,
     handlers: AddHandlers,
     announce?: string[],
+    deselect?: boolean,
   ): void {
     const client = this.ensureClient();
     const existing = this.torrents.get(id);
@@ -92,7 +100,11 @@ export class TorrentEngine {
       } catch {}
     }
 
-    const opts = announce && announce.length > 0 ? { path: dir, announce } : { path: dir };
+    const opts: { path: string; announce?: string[]; deselect?: boolean } = {
+      path: dir,
+      ...(announce && announce.length > 0 ? { announce } : {}),
+      ...(deselect ? { deselect: true } : {}),
+    };
     let torrent: Torrent;
     try {
       torrent = client.add(source, opts);
@@ -132,10 +144,93 @@ export class TorrentEngine {
     return this.client?.torrentPort ?? null;
   }
 
+  getTorrent(id: string): Torrent | undefined {
+    return this.torrents.get(id);
+  }
+
   // A torrent's file paths relative to its download dir, top-level folder
   // included; empty before metadata arrives or once the torrent is gone.
   filePaths(id: string): string[] {
     return (this.torrents.get(id)?.files ?? []).map((file) => file.path);
+  }
+
+  files(id: string): TorrentFileInfo[] {
+    return (this.torrents.get(id)?.files ?? []).map((file, index) => ({
+      index,
+      name: file.name,
+      path: file.path,
+      length: file.length,
+    }));
+  }
+
+  selectFiles(id: string, fileIndices: number[]): void {
+    const t = this.torrents.get(id);
+    if (!t?.files) return;
+    const targets = new Set(fileIndices);
+    t.files.forEach((file, index) => {
+      if (targets.has(index)) {
+        file.select();
+      } else {
+        file.deselect();
+      }
+    });
+  }
+
+  fetchMetadata(
+    source: string,
+    announce?: string[],
+    timeoutMs = 25000,
+  ): Promise<{ name: string; infoHash: string; files: TorrentFileInfo[] }> {
+    return new Promise((resolve, reject) => {
+      const client = this.ensureClient();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      let settled = false;
+
+      const done = (err?: Error, result?: { name: string; infoHash: string; files: TorrentFileInfo[] }) => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        try {
+          torrent?.destroy();
+        } catch {}
+        if (err) reject(err);
+        else if (result) resolve(result);
+      };
+
+      timer = setTimeout(() => {
+        done(new Error("Fetching torrent metadata timed out"));
+      }, timeoutMs);
+
+      let torrent: Torrent;
+      try {
+        torrent = client.add(source, {
+          path: "/tmp",
+          ...(announce && announce.length > 0 ? { announce } : {}),
+          deselect: true,
+        });
+      } catch (e) {
+        done(e instanceof Error ? e : new Error(String(e)));
+        return;
+      }
+
+      torrent.on("metadata", () => {
+        const files: TorrentFileInfo[] = (torrent.files || []).map((f, i) => ({
+          index: i,
+          name: f.name,
+          path: f.path,
+          length: f.length,
+        }));
+        done(undefined, {
+          name: torrent.name,
+          infoHash: torrent.infoHash,
+          files,
+        });
+      });
+
+      torrent.on("error", (err: unknown) => {
+        done(err instanceof Error ? err : new Error(String(err)));
+      });
+    });
   }
 
   stats(id: string): TorrentProgress | null {

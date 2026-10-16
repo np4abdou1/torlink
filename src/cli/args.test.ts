@@ -278,3 +278,74 @@ describe("seed", () => {
     expect(parseCliArgs(["seed"])).toEqual({ kind: "invalid", arg: "seed (missing path)" });
   });
 });
+
+describe("explore", () => {
+  it("parses explore command with magnet or .torrent", () => {
+    expect(parseCliArgs(["explore", "magnet:?xt=urn:btih:abc"])).toEqual({
+      kind: "explore",
+      target: "magnet:?xt=urn:btih:abc",
+      json: false,
+    });
+    expect(parseCliArgs(["list", "./show.torrent", "--json"])).toEqual({
+      kind: "explore",
+      target: "./show.torrent",
+      json: true,
+    });
+  });
+
+  it("requires a target", () => {
+    expect(parseCliArgs(["explore"]).kind).toBe("invalid");
+  });
+});
+
+describe("stream", () => {
+  it("parses stream command with options", () => {
+    expect(parseCliArgs(["stream", "magnet:?xt=urn:btih:abc"])).toEqual({
+      kind: "stream",
+      target: "magnet:?xt=urn:btih:abc",
+      fileIndex: undefined,
+      episode: undefined,
+      port: undefined,
+      player: undefined,
+      noPlayer: false,
+    });
+
+    expect(
+      parseCliArgs([
+        "stream",
+        "magnet:?xt=urn:btih:abc",
+        "--episode",
+        "3",
+        "--port",
+        "9200",
+        "--player",
+        "mpv",
+        "--no-player",
+      ]),
+    ).toEqual({
+      kind: "stream",
+      target: "magnet:?xt=urn:btih:abc",
+      fileIndex: undefined,
+      episode: 3,
+      port: 9200,
+      player: "mpv",
+      noPlayer: true,
+    });
+
+    expect(
+      parseCliArgs(["play", "./movie.torrent", "--file", "2"]),
+    ).toEqual({
+      kind: "stream",
+      target: "./movie.torrent",
+      fileIndex: 2,
+      episode: undefined,
+      port: undefined,
+      player: undefined,
+      noPlayer: false,
+    });
+  });
+
+  it("requires a target", () => {
+    expect(parseCliArgs(["stream"]).kind).toBe("invalid");
+  });
+});

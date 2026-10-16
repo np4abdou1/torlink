@@ -38,4 +38,5 @@ export interface QueueItem {
   addedAt: number;
   // Carried from add() into the history entry on completion (see HistoryItem).
   seedTimeMs?: number;
+  selectedFiles?: number[];
 }

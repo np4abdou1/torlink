@@ -5,6 +5,11 @@ declare module "webtorrent" {
     name: string;
     path: string;
     length: number;
+    downloaded?: number;
+    progress?: number;
+    select(priority?: number): void;
+    deselect(): void;
+    createReadStream(opts?: { start?: number; end?: number }): NodeJS.ReadableStream;
   }
 
   interface Torrent extends EventEmitter {
@@ -27,6 +32,10 @@ declare module "webtorrent" {
     files: TorrentFile[];
     pause(): void;
     resume(): void;
+    select(start: number, end: number, priority?: number, notify?: () => void): void;
+    deselect(start: number, end: number, priority?: boolean): void;
+    critical(start: number, end: number): void;
+    createServer(opts?: Record<string, unknown>): import("node:http").Server;
     addPeer(peer: string): boolean;
     destroy(cb?: (err?: Error) => void): void;
   }
@@ -34,6 +43,8 @@ declare module "webtorrent" {
   interface TorrentOptions {
     path?: string;
     announce?: string[];
+    deselect?: boolean;
+    strategy?: "rarest" | "sequential";
   }
 
   interface WebTorrentOptions {

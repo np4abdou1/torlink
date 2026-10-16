@@ -35,6 +35,7 @@ export interface DownloadInput {
   magnet: string;
   source?: SourceId;
   sizeBytes?: number;
+  selectedFiles?: number[];
 }
 
 export interface Store {
@@ -74,6 +75,10 @@ export interface Store {
   // Fetches the .torrent metadata for a search result (via magnet if not yet
   // cached) and exports it to the configured download folder.
   fetchAndExportTorrent: (input: { id: string; name: string; magnet: string }) => void;
+
+  exploringTorrent: DownloadInput | null;
+  openFileExplorer: (input: DownloadInput) => void;
+  closeFileExplorer: () => void;
 
   notice: string | null;
   setNotice: (s: string | null) => void;

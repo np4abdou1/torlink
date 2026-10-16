@@ -67,6 +67,7 @@ export interface AddInput {
   // Stop seeding this long (ms) after it finishes; 0 = never. Undefined leaves
   // the daemon-wide --seed-time in charge.
   seedTimeMs?: number;
+  selectedFiles?: number[];
 }
 
 export interface RestoreOptions {
@@ -106,6 +107,10 @@ export class DownloadQueue extends EventEmitter {
     this.trackers = trackers;
   }
 
+  getEngine(): TorrentEngine {
+    return this.engine;
+  }
+
   getItems(): QueueItem[] {
     return [...this.items.values()].sort((a, b) => b.addedAt - a.addedAt);
   }
@@ -140,6 +145,7 @@ export class DownloadQueue extends EventEmitter {
           status: "downloading",
           error: undefined,
           speed: 0,
+          ...(input.selectedFiles ? { selectedFiles: input.selectedFiles } : {}),
           ...(input.seedTimeMs !== undefined ? { seedTimeMs: input.seedTimeMs } : {}),
           ...(existing.dir === dir
             ? {}
@@ -158,6 +164,7 @@ export class DownloadQueue extends EventEmitter {
           speed: 0,
           peers: 0,
           addedAt: Date.now(),
+          ...(input.selectedFiles ? { selectedFiles: input.selectedFiles } : {}),
           ...(input.seedTimeMs !== undefined ? { seedTimeMs: input.seedTimeMs } : {}),
         };
     // Respect the concurrent-download cap: start now if a slot is free, else
@@ -190,7 +197,8 @@ export class DownloadQueue extends EventEmitter {
       // shipped with, so passing them explicitly is what keeps that merge from
       // being undone on resume. webtorrent dedupes announce internally.
       const announce = [...(trackersOf(item.magnet) ?? []), ...this.trackers];
-      this.engine.add(item.id, source, item.dir, this.engineHandlers(item.id), announce);
+      const deselect = !!(item.selectedFiles && item.selectedFiles.length > 0);
+      this.engine.add(item.id, source, item.dir, this.engineHandlers(item.id), announce, deselect);
     } catch (e) {
       // engine.add routes webtorrent's own synchronous failures through
       // onError, so the only throw that reaches here is the client failing to
@@ -243,6 +251,9 @@ export class DownloadQueue extends EventEmitter {
         if (meta.torrentFile) void saveTorrentMeta(id, meta.torrentFile);
         const it = this.items.get(id);
         if (!it) return; // the rest only matters while still downloading
+        if (it.selectedFiles && it.selectedFiles.length > 0) {
+          this.engine.selectFiles(id, it.selectedFiles);
+        }
         if (meta.name) it.name = meta.name;
         if (meta.total) it.totalBytes = meta.total;
         it.files = meta.files;

@@ -35,7 +35,9 @@ containUnhandledRejections({
     cmd.kind === "watch" ||
     cmd.kind === "seed" ||
     cmd.kind === "serve" ||
-    cmd.kind === "files",
+    cmd.kind === "files" ||
+    cmd.kind === "explore" ||
+    cmd.kind === "stream",
 });
 
 // Run/reattach the TUI inside a persistent tmux session (execs tmux, then exits).
@@ -106,6 +108,24 @@ if (cmd.kind === "update") {
       // the caller's pipe would stay open until that gave up on its own.
       process.stdout.write(`${JSON.stringify(document)}\n`, () => process.exit(exitCode));
     })
+} else if (cmd.kind === "explore") {
+  void import("./cli/explore")
+    .then(({ runExplore }) => runExplore({ target: cmd.target, json: cmd.json }))
+    .then(() => process.exit(0))
+    .catch(failHeadless);
+} else if (cmd.kind === "stream") {
+  void import("./cli/stream")
+    .then(({ runStream }) =>
+      runStream({
+        target: cmd.target,
+        fileIndex: cmd.fileIndex,
+        episode: cmd.episode,
+        port: cmd.port,
+        player: cmd.player,
+        noPlayer: cmd.noPlayer,
+      }),
+    )
+    .then(() => process.exit(0))
     .catch(failHeadless);
 } else {
 

@@ -45,6 +45,7 @@ import { TabTitle } from "./components/TabTitle";
 import { Splash } from "./views/Splash";
 import { FolderPrompt } from "./components/FolderPrompt";
 import { TrackersPrompt } from "./components/TrackersPrompt";
+import { FileModal } from "./components/FileModal";
 import { footerHints } from "./keymap";
 import { COLOR, ICON } from "./theme";
 import { useMouseWheel } from "./hooks/useMouseWheel";
@@ -120,6 +121,7 @@ export function App({
   const [pendingDownload, setPendingDownload] = useState<DownloadInput[] | null>(null);
   const onQueuedRef = useRef<(() => void) | undefined>(undefined);
   const [lastDownloadToDir, setLastDownloadToDir] = useState<string | null>(null);
+  const [exploringTorrent, setExploringTorrent] = useState<DownloadInput | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [updateVersion, setUpdateVersion] = useState<string | null>(null);
   const [recovered, setRecovered] = useState(false);
@@ -403,6 +405,14 @@ export function App({
     [queue, config],
   );
 
+  const openFileExplorer = useCallback((input: DownloadInput) => {
+    setExploringTorrent(input);
+  }, []);
+
+  const closeFileExplorer = useCallback(() => {
+    setExploringTorrent(null);
+  }, []);
+
   // A .torrent dragged onto the terminal lands in the search field as a path.
   // Read it, hand the queue the magnet built from its metadata, and say so when
   // it can't be read rather than quietly searching for the path text.
@@ -504,7 +514,7 @@ export function App({
       submitQuery,
       section,
       setSection,
-      region: showHelp || editingFolder || editingTrackers || pendingDownload ? "help" : region,
+      region: showHelp || editingFolder || editingTrackers || pendingDownload || exploringTorrent ? "help" : region,
       setRegion,
       captureMode,
       setCaptureMode,
@@ -520,6 +530,9 @@ export function App({
       openDownloadFolder,
       exportTorrent,
       fetchAndExportTorrent,
+      exploringTorrent,
+      openFileExplorer,
+      closeFileExplorer,
       notice,
       setNotice,
       quitAll,
@@ -541,6 +554,9 @@ export function App({
     editingFolder,
     editingTrackers,
     pendingDownload,
+    exploringTorrent,
+    openFileExplorer,
+    closeFileExplorer,
     captureMode,
     downloadFocus,
     seedFocus,
@@ -567,7 +583,7 @@ export function App({
         quitAll();
         return;
       }
-      if (editingFolder || editingTrackers || pendingDownload) return; // the prompt owns input (its own esc + enter)
+      if (editingFolder || editingTrackers || pendingDownload || exploringTorrent) return; // the prompt owns input (its own esc + enter)
       if (captureMode === "text") return;
       if (showHelp) {
         setShowHelp(false);
@@ -699,10 +715,32 @@ export function App({
           </Box>
         ) : null}
 
+        {exploringTorrent ? (
+          <Box marginTop={1}>
+            <FileModal
+              torrent={exploringTorrent}
+              width={Math.max(24, Math.min(cols - 4, 82))}
+              height={Math.max(12, rows - 4)}
+              onClose={closeFileExplorer}
+              onDownloadSelected={(selectedIndices) => {
+                startDownload({
+                  ...exploringTorrent,
+                  selectedFiles: selectedIndices,
+                });
+                closeFileExplorer();
+              }}
+            />
+          </Box>
+        ) : null}
+
         <Box
           height={bodyH}
           marginTop={compact ? 0 : 1}
-          display={showHelp || editingFolder || editingTrackers || pendingDownload ? "none" : "flex"}
+          display={
+            showHelp || editingFolder || editingTrackers || pendingDownload || exploringTorrent
+              ? "none"
+              : "flex"
+          }
           overflow="hidden"
         >
           <Sidebar />
@@ -718,7 +756,13 @@ export function App({
         </Box>
 
         {showFooter ? (
-          <Box display={showHelp || editingFolder || editingTrackers || pendingDownload ? "none" : "flex"}>
+          <Box
+            display={
+              showHelp || editingFolder || editingTrackers || pendingDownload || exploringTorrent
+                ? "none"
+                : "flex"
+            }
+          >
             <Footer hints={footerHints(region, section, downloadFocus, seedFocus, resultFocus)} />
           </Box>
         ) : null}
