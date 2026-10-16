@@ -27,11 +27,13 @@ describe("player utility", () => {
     expect(args.some((a) => a.startsWith("--sub-file="))).toBe(false);
   });
 
-  it("detects system mpv availability", async () => {
-    // mpv is installed on this linux environment
-    const available = await isMpvAvailable("mpv");
-    expect(typeof available).toBe("boolean");
-    expect(available).toBe(true);
+  it("detects player binary availability correctly", async () => {
+    // 'node' is guaranteed to exist on CI and developer machines
+    const nodeAvailable = await isMpvAvailable("node");
+    expect(nodeAvailable).toBe(true);
+
+    const mpvAvailable = await isMpvAvailable("mpv");
+    expect(typeof mpvAvailable).toBe("boolean");
 
     const nonExistent = await isMpvAvailable("non_existent_player_binary_12345");
     expect(nonExistent).toBe(false);
