@@ -1,0 +1,20 @@
+# Maintainer: Abdou <https://github.com/np4abdou1>
+pkgname=torlnk-bin
+pkgver=1.10.0
+pkgrel=1
+pkgdesc="A sleek, zero-setup torrent finder, downloader, explorer and streamer that lives in your terminal"
+arch=('x86_64')
+url="https://github.com/np4abdou1/torlink"
+license=('MIT')
+depends=('glibc')
+optdepends=('mpv: live video and episode streaming with companion subtitles')
+provides=('torlnk')
+conflicts=('torlnk')
+source=("https://github.com/np4abdou1/torlink/releases/download/v${pkgver}/torlnk-linux-x64.tar.gz")
+sha256sums=('SKIP')
+
+package() {
+    install -Dm755 "${srcdir}/torlnk" "${pkgdir}/usr/bin/torlnk"
+    install -Dm644 "${srcdir}/LICENSE" "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+    install -Dm644 "${srcdir}/README.md" "${pkgdir}/usr/share/doc/${pkgname}/README.md"
+}

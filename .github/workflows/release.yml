@@ -1,0 +1,95 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag (e.g. v1.10.0, defaults to git tag / package version)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-linux-x64:
+    name: Build Standalone Linux x64 Binary (Arch Linux / glibc)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run typecheck
+        run: npm run typecheck
+
+      - name: Run test suite
+        run: npm test
+
+      - name: Build JS bundle
+        run: npm run build
+
+      - name: Build standalone Linux x64 binary
+        run: npm run build:binary
+
+      - name: Verify standalone binary execution
+        run: |
+          ./torlnk --version
+          ./torlnk --help
+
+      - name: Package release assets
+        run: |
+          # 1. Direct standalone binary named torlnk-linux-x64
+          cp ./torlnk ./torlnk-linux-x64
+
+          # 2. Compressed tarball with binary, docs, and Arch Linux PKGBUILD
+          tar -czvf torlnk-linux-x64.tar.gz torlnk LICENSE README.md packaging/arch/PKGBUILD
+
+          # 3. Cryptographic checksums
+          sha256sum torlnk torlnk-linux-x64 torlnk-linux-x64.tar.gz > SHA256SUMS.txt
+
+      - name: Determine Release Tag
+        id: release_tag
+        run: |
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            TAG="${{ github.event.inputs.tag_name }}"
+          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+          else
+            TAG="v$(node -p "require('./package.json').version")"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release_tag.outputs.tag }}
+          name: torlink ${{ steps.release_tag.outputs.tag }}
+          files: |
+            torlnk
+            torlnk-linux-x64
+            torlnk-linux-x64.tar.gz
+            SHA256SUMS.txt
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
